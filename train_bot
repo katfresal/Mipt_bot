@@ -1,5 +1,5 @@
 from aiogram.dispatcher.filters import Text
-import requests
+import aiohttp
 import datetime
 from datetime import date
 from aiogram import Bot, Dispatcher, executor, types
@@ -25,7 +25,7 @@ def make_json(api_y: str, station_from, station_to):
     now = date.today()
     url = f'https://api.rasp.yandex.net/v3.0/search/?from={station_from}&to={station_to}&format=json&apikey={api_y}' \
           f'&lang=ru_RU&page=2&date={now}&system=yandex&limit=200'
-    yandex_req = requests.get(url)
+    yandex_req = aiohttp.get(url)
     yandex_json = json.loads(yandex_req.text)
     return yandex_json
 
