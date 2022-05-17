@@ -1,10 +1,11 @@
-from aiogram.dispatcher.filters import Text
-import aiohttp
 import datetime
 from datetime import date
 from aiogram import Bot, Dispatcher, executor, types
 import json
 import urllib3
+import station as stat
+import aiohttp
+import asyncio
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -13,24 +14,33 @@ yandex_api = "5d00a2a3-fdd0-4fcd-9da7-0c17e5f470e5"
 bot = Bot(token)
 dp = Dispatcher(bot)
 
-novodachka = "s9601261"
-timka = "s9602463"
-circle = "s9601830"
-dolgopa = "s9600766"
-savela = "s2000009"
-bel = "s2000006"
+
+async def fetch(session, url):
+    async with session.get(url) as response:
+        return await response.text()
 
 
-def make_json(api_y: str, station_from, station_to):
+async def fetch_all(session, urls, loop):
+    results = await asyncio.gather(
+        *[fetch(session, url) for url in urls],
+        return_exceptions=True
+    )
+    return results
+
+
+async def make_json(api_y: str, station_from, station_to):
     now = date.today()
+
     url = f'https://api.rasp.yandex.net/v3.0/search/?from={station_from}&to={station_to}&format=json&apikey={api_y}' \
           f'&lang=ru_RU&page=2&date={now}&system=yandex&limit=200'
-    yandex_req = aiohttp.get(url)
-    yandex_json = json.loads(yandex_req.text)
-    return yandex_json
+
+    async with aiohttp.ClientSession() as session:
+        response = await fetch(session, url)
+
+    return json.loads(response)
 
 
-def find_train(data: json):
+async def find_train(data: json):
     now = datetime.datetime.now()
     now = now.isoformat()
     i = 0
@@ -44,9 +54,8 @@ def find_train(data: json):
 
 @dp.message_handler(commands=['start'])
 async def start_menu(message: types.Message):
-    start_message1 = "Привет, это бот, который поможет тебе успевать на электрички! \n"
-    start_message2 = "Чтобы узнать подробнее, воспользуйся командой /help"
-    start_message = start_message1 + start_message2
+    start_message = "Привет, это бот, который поможет тебе успевать на электрички! \n" + \
+                    "Чтобы узнать подробнее, воспользуйся командой /help"
     await message.reply(start_message)
 
 
@@ -59,63 +68,38 @@ async def start_menu(message: types.Message):
 @dp.message_handler(commands=['next'])
 async def choose_station(message: types.Message):
     mes = "Выбери станцию, с которой отправляешься"
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    buttons1 = ["Долгопрудная", "Новодачная"]
-    keyboard.add(*buttons1)
-    buttons2 = ["Тимирязевская", "Окружная"]
-    keyboard.add(*buttons2)
-    buttons3 = ["Савеловская", "Белорусская"]
-    keyboard.add(*buttons3)
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    button = types.InlineKeyboardButton("Новодачная", callback_data='nov')
+    button1 = types.InlineKeyboardButton("Долгопрудная", callback_data='dolg')
+    keyboard.add(button, button1)
+    button = types.InlineKeyboardButton("Окружная", callback_data='circle')
+    button1 = types.InlineKeyboardButton("Тимирязевская", callback_data='timka')
+    keyboard.add(button, button1)
+    button = types.InlineKeyboardButton("Савеловская", callback_data='savels')
+    button1 = types.InlineKeyboardButton("Белорусская", callback_data='bel')
+    keyboard.add(button, button1)
+
     await message.answer(mes, reply_markup=keyboard)
 
 
-@dp.message_handler(Text(equals="Белорусская"))
-async def start_bel(message: types.Message):
-    mess = "Оставь надежду, всяк сюда входящий! \n"
-    now_json = make_json(yandex_api, bel, dolgopa)
-    mess = mess + str(find_train(now_json))
-
-    await message.reply(mess)
-
-
-@dp.message_handler(Text(equals="Новодачная"))
-async def start_novodachka(message: types.Message):
-    now_json = make_json(yandex_api, novodachka, savela)
+@dp.callback_query_handler(lambda c: True)
+async def callback_inline(call):
+    now_json = 0
+    if call.data == 'nov':
+        now_json = await make_json(yandex_api, stat.novodachka, stat.savela)
+    elif call.data == 'dolg':
+        now_json = await make_json(yandex_api, stat.dolgopa, stat.savela)
+    elif call.data == 'circle':
+        now_json = await make_json(yandex_api, stat.circle, stat.dolgopa)
+    elif call.data == 'timka':
+        now_json = await make_json(yandex_api, stat.timka, stat.dolgopa)
+    elif call.data == 'savels':
+        now_json = await make_json(yandex_api, stat.savela, stat.dolgopa)
+    elif call.data == 'bel':
+        now_json = await make_json(yandex_api, stat.bel, stat.dolgopa)
     mess = "Следующая электричка прибудет: \n"
-    mess = mess + str(find_train(now_json))
-    await message.answer(mess)
-
-
-@dp.message_handler(Text(equals="Долгопрудная"))
-async def start_dolgopa(message: types.Message):
-    now_json = make_json(yandex_api, dolgopa, savela)
-    mess = "Следующая электричка прибудет: \n"
-    mess = mess + str(find_train(now_json))
-    await message.answer(mess)
-
-
-@dp.message_handler(Text(equals="Окружная"))
-async def start_circle(message: types.Message):
-    now_json = make_json(yandex_api, circle, dolgopa)
-    mess = "Следующая электричка прибудет: \n"
-    mess = mess + str(find_train(now_json))
-    await message.answer(mess)
-
-
-@dp.message_handler(Text(equals="Тимирязевская"))
-async def start_timka(message: types.Message):
-    now_json = make_json(yandex_api, timka, dolgopa)
-    mess = "Следующая электричка прибудет: \n"
-    mess = mess + str(find_train(now_json))
-    await message.answer(mess)
-
-
-@dp.message_handler(Text(equals="Савеловская"))
-async def start_savela(message: types.Message):
-    now_json = make_json(yandex_api, savela, dolgopa)
-    mess = "Следующая электричка прибудет: \n"
-    mess = mess + str(find_train(now_json))
-    await message.answer(mess)
+    mess = mess + str(await find_train(now_json))
+    await bot.send_message(call.message.chat.id, mess)
 
 
 if __name__ == '__main__':
