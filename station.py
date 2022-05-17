@@ -1,0 +1,6 @@
+novodachka = "s9601261"
+timka = "s9602463"
+circle = "s9601830"
+dolgopa = "s9600766"
+savela = "s2000009"
+bel = "s2000006"
