@@ -9,8 +9,8 @@ import asyncio
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-token = '5349770843:AAHBhB-_mJYPr6w4DIGpl0mdMJU4A841duw'
-yandex_api = "5d00a2a3-fdd0-4fcd-9da7-0c17e5f470e5"
+token = 'bot_token'
+yandex_api = "API_YAND"
 bot = Bot(token)
 dp = Dispatcher(bot)
 
